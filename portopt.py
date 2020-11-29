@@ -15,15 +15,14 @@ def _read_csv(file):
     with open(file, 'r') as assets:
         reader = csv.reader(assets)
         assets = {rows[0]: rows[1] for rows in reader}
-    
+
     tickers = assets.keys()
     invesment_names = assets.values()
-
     return tickers, invesment_names
 
 
 class PortOpt:
-    """Efficient frontier analysis & asset allocation optimization"""
+    """Investment portfolio optimization"""
 
     def __init__(self, assets: str = 'assets.csv'):
         self.tickers, self.investment_names = _read_csv(assets)
@@ -45,9 +44,6 @@ class PortOpt:
         cov = returns.cov() * 252
         corr = returns.corr()
         print('\n\n', corr)
-        
-        cov.to_csv('bin/covariance.csv')
-        corr.to_csv('bin/correlation.csv')
 
         ret, vol, wgt = ([] for i in range(3))
 
@@ -61,25 +57,26 @@ class PortOpt:
 
         # create porfolios dataframe
         portfolios = pd.DataFrame({
-            'return': ret,
-            'volatility': vol,
-            'weights': wgt
+            'Return': ret,
+            'Volatility': vol,
+            'Weights': wgt
         })
-
         # calc sharpe for each portfolio (row) in dataframe
-        portfolios['sharpe'] = (portfolios['return'] - rf) / portfolios['volatility']
-
+        portfolios['Sharpe'] = (portfolios['Return'] - rf) / portfolios['Volatility']
         return portfolios
     
     # plot EF
     @staticmethod
-    def _plot(data):
+    def _plot(data, x, y):
+        # plot all portfolios
         plt.scatter(
-            data['volatility'],
-            data['return'],
-            c=data['sharpe'],
+            data['Volatility'],
+            data['Return'],
+            c=data['Sharpe'],
             marker='.'
         )
+        # highlight best portfolio
+        plt.scatter(x, y, marker='.', c='red')
         plt.xlabel('Expected Volatility')
         plt.ylabel('Expected Return')
         plt.colorbar(label='Sharpe Ratio')
@@ -95,15 +92,32 @@ class PortOpt:
         portfolios = self._simulate(returns, n, rf)
 
         # find optimal portfolio (max sharpe)
-        opt_port = pd.DataFrame(portfolios.loc[portfolios['sharpe'] == portfolios['sharpe'].max()])
+        opt_port = pd.DataFrame(portfolios.loc[portfolios['Sharpe'] == portfolios['Sharpe'].max()])
         print('\n\n', opt_port)
+        x, y = opt_port['Volatility'], opt_port['Return']
 
         opt_weights = []
-        for w in opt_port['weights']:
+        for w in opt_port['Weights']:
             for _ in w:
                 opt_weights.append(f'{round(_ * 100, 2)} %')
         opt_weights = list(zip(self.tickers, self.investment_names, opt_weights))
-        opt = pd.DataFrame(opt_weights, columns=['ticker', 'investment name', 'allocation'])
+        opt = pd.DataFrame(opt_weights, columns=['Ticker', 'Investment Name', 'Allocation'])
         print('\n\n', opt)
            
-        self._plot(portfolios)
+        _plot(portfolios, x, y)
+
+# plot EF
+def _plot(data, x, y):
+    # plot all portfolios
+    plt.scatter(
+        data['Volatility'],
+        data['Return'],
+        c=data['Sharpe'],
+        marker='.'
+    )
+    # highlight best portfolio
+    plt.scatter(x, y, marker='.', c='red')
+    plt.xlabel('Expected Volatility')
+    plt.ylabel('Expected Return')
+    plt.colorbar(label='Sharpe Ratio')
+    plt.show()
