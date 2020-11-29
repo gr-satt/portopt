@@ -109,7 +109,3 @@ class Optimize:
         print(opt)
            
         self._plot(portfolios)
-
-
-if __name__ == '__main__':
-    Optimize().opt()
