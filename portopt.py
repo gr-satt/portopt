@@ -1,9 +1,8 @@
 import csv
-from os import path
 
 import numpy as np
 import pandas as pd
-from pandas_datareader import data as wb
+from pandas_datareader import data as pdr
 import matplotlib.pyplot as plt
 
 
@@ -30,7 +29,7 @@ class PortOpt:
     def _get_price_data(self, startdate):
         data = pd.DataFrame()
         for ticker in self.tickers:
-            data[ticker] = wb.DataReader(ticker, 'yahoo', startdate)['Adj Close']
+            data[ticker] = pdr.DataReader(ticker, 'yahoo', startdate)['Adj Close']
         return data
     
     # daily log returns
@@ -38,12 +37,28 @@ class PortOpt:
         returns = np.log(data / data.shift(1))
         return returns
     
+    # covariance table
+    def covariance(self, startdate: str = '2020-6-1'):
+        """params:
+        startdate: year-month-day
+        """
+        data = self._get_price_data(startdate)
+        returns = self._calc_returns(data)
+        return returns.cov() * 252              # 252 trading days / yr on avg
+
+    # correlation table
+    def correlation(self, startdate: str = '2020-6-1'):
+        """params:
+        startdate: year-month-day 
+        """
+        data = self._get_price_data(startdate)
+        returns = self._calc_returns(data)
+        return returns.corr()
+    
     # simulate n # of portfolio variations
     def _simulate(self, returns, n, rf):
-        mean = returns.mean() * 252         # 252 trading days / yr on avg
+        mean = returns.mean() * 252
         cov = returns.cov() * 252
-        corr = returns.corr()
-        print('\n\n', corr.to_string(index=True))
 
         ret, vol, wgt = ([] for i in range(3))
 
@@ -65,7 +80,7 @@ class PortOpt:
         portfolios['Sharpe'] = (portfolios['Return'] - rf) / portfolios['Volatility']
         return portfolios
  
-    def optimize(self, n: int = 1000, rf: float = 0.0009, startdate: str = '2020-6-1'):
+    def optimize(self, n: int = 1000, rf: float = 0.0009, startdate: str = '2020-6-1', plot: bool = True):
         """params:
         n: # of portfolio simulations
         rf: risk-free rate
@@ -76,19 +91,21 @@ class PortOpt:
         portfolios = self._simulate(returns, n, rf)
 
         # find optimal portfolio (max sharpe)
-        opt_port = pd.DataFrame(portfolios.loc[portfolios['Sharpe'] == portfolios['Sharpe'].max()])
-        print('\n\n', opt_port.to_string(index=False))
-        x, y = opt_port['Volatility'], opt_port['Return']
+        portfolio_data = pd.DataFrame(portfolios.loc[portfolios['Sharpe'] == portfolios['Sharpe'].max()])
+        x, y = portfolio_data['Volatility'], portfolio_data['Return']
 
         opt_weights = []
-        for w in opt_port['Weights']:
+        for w in portfolio_data['Weights']:
             for _ in w:
                 opt_weights.append(f'{round(_ * 100, 2)} %')
+        del portfolio_data['Weights']
         opt_weights = list(zip(self.tickers, self.investment_names, opt_weights))
-        opt = pd.DataFrame(opt_weights, columns=['Ticker', 'Investment Name', 'Allocation'])
-        print('\n\n', opt.to_string(index=False))
-           
-        _plot(portfolios, x, y)
+        allocations = pd.DataFrame(opt_weights, columns=['Ticker', 'Investment Name', 'Allocation'])
+        
+        if plot:
+            _plot(portfolios, x, y)
+        
+        return portfolio_data, allocations
 
 # plot EF
 def _plot(data, x, y):
