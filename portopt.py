@@ -1,5 +1,5 @@
 import csv
-from os import getcwd
+from os import getcwd, walk, path
 
 import numpy as np
 import pandas as pd
@@ -12,8 +12,16 @@ import mplcursors
 gr-satt"""
 
 
-def _read_csv(file):
-    with open(file, 'r') as assets:
+def _read_csv(csv_name):
+    # scan all subdirectories for csv_name
+    for root, _, files in walk(getcwd()):
+        if csv_name in files:
+            csv_path = path.abspath(path.join(root, csv_name))
+        else: 
+            raise FileNotFoundError
+
+    # read csv to dict - k: ticker, v: investment name
+    with open(csv_path, 'r') as assets:
         reader = csv.reader(assets)
         assets = {rows[0]: rows[1] for rows in reader}
 
@@ -25,7 +33,7 @@ class PortOpt:
     """Investment portfolio optimization"""
 
     def __init__(self, assets: str = 'assets.csv'):
-        self.tickers, self.investment_names = _read_csv(f'{getcwd()}/assets/{assets}')
+        self.tickers, self.investment_names = _read_csv(assets)
 
     # daily adj. close price to dataframe
     def _get_price_data(self, startdate):
